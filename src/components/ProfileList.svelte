@@ -31,8 +31,8 @@
 <style>
   .wrapper {
     position: relative;
-    border: 1px solid ButtonBorder;
-    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-lg);
     overflow: hidden;
   }
 
@@ -54,7 +54,7 @@
   .spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid ButtonBorder;
+    border: 2px solid var(--border);
     border-top-color: LinkText;
     border-radius: 50%;
     animation: spin 0.7s linear infinite;

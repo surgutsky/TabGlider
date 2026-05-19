@@ -43,9 +43,18 @@ export async function setProfile(profile: Profile): Promise<void> {
 
 export async function deleteProfile(id: string): Promise<void> {
   try {
+    const index = await getIndex()
+    if (!index) throw new Error('No profiles index found')
+    const entry = index.profiles.find(p => p.id === id)
+    if (entry?.name === 'Default') throw new Error('Cannot delete Default profile')
+    if (index.profiles.length <= 1) throw new Error('Cannot delete the only profile')
     await chrome.storage.local.remove(profileKey(id))
+    const remaining = index.profiles.filter(p => p.id !== id)
+    const newActiveId = index.activeProfileId === id ? remaining[0].id : index.activeProfileId
+    await setIndex({ ...index, profiles: remaining, activeProfileId: newActiveId })
   } catch (e) {
     console.error(`Failed to delete profile ${id}`, e)
+    throw e
   }
 }
 
@@ -84,13 +93,15 @@ export async function patchProfile(id: string, patch: Partial<Profile>): Promise
 }
 
 export async function addClosedTab(profileId: string, url: string): Promise<void> {
-  if (url.startsWith('chrome://') || url.startsWith('about:')) return
+  if (!url || url.startsWith('chrome://') || url.startsWith('about:')) return
   try {
     const [profile, settings] = await Promise.all([getProfile(profileId), getSettings()])
     if (!profile) return
     const closedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
     const entry: ClosedTab = { url, closedAt }
-    const closedTabs = [entry, ...profile.closedTabs].slice(0, settings.closedTabsLimit)
+    const deduped = profile.closedTabs.filter(t => t.url !== url)
+    const closedTabs = [entry, ...deduped]
+    if (closedTabs.length > settings.closedTabsLimit) closedTabs.pop()
     await setProfile({ ...profile, closedTabs })
   } catch (e) {
     console.error(`Failed to add closed tab for profile ${profileId}`, e)

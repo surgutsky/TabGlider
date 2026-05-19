@@ -1,15 +1,15 @@
 <script lang="ts">
   interface Props {
-    profile: { id: string; name: string }
-    isActive: boolean
-    onswitch: () => void
+    profile: { id: string; name: string };
+    isActive: boolean;
+    onswitch: () => void;
   }
 
-  let { profile, isActive, onswitch }: Props = $props()
+  let { profile, isActive, onswitch }: Props = $props();
 </script>
 
 <li class:active={isActive} onclick={!isActive ? onswitch : undefined}>
-  <span class="check" aria-hidden="true">{isActive ? '✓' : ''}</span>
+  <span class="dot" class:dot-active={isActive} aria-hidden="true"></span>
   <span class="name">{profile.name}</span>
 </li>
 
@@ -28,15 +28,27 @@
     cursor: pointer;
   }
 
-  li:not(.active):hover { background: ButtonFace; }
+  li:not(.active):hover {
+    background: var(--accent-subtle);
+  }
 
-  .check {
-    width: 14px;
+  li.active {
+    background: var(--accent-subtle);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 700;
-    color: LinkText;
-    text-align: center;
+    background: var(--border);
+    transition:
+      background 0.12s,
+      box-shadow 0.12s;
+  }
+  .dot.dot-active {
+    background: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-subtle);
   }
 
   .name {

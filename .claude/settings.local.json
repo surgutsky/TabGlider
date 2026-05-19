@@ -10,7 +10,11 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Exclude node_modules,dist -Recurse -Force | Where-Object {$_.PSIsContainer -eq $false} | Select-Object -ExpandProperty FullName | Sort-Object)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse -Directory)",
+      "Bash(grep -E \"\\\\.\\(json|md|txt\\)$\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse)",
+      "PowerShell(head *)"
     ]
   }
 }

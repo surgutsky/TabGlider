@@ -1,9 +1,7 @@
-import { getIndex, setIndex, getProfile, setProfile, initDefaultProfile } from '../lib/storage'
-import { getSettings } from '../lib/storage/settings'
+import { getIndex, setIndex, getProfile, setProfile, deleteProfile, initDefaultProfile, addClosedTab } from '../lib/storage'
 import { captureAllWindows, patchProfile } from '../lib/tabs/capture'
 import { restoreProfile } from '../lib/tabs/restore'
 import { debounce } from '../lib/tabs/events'
-import type { ClosedTab } from '../lib/types'
 
 ;(async () => {
   await initDefaultProfile()
@@ -47,15 +45,6 @@ chrome.runtime.onStartup.addListener(async () => {
 // Shared mutable flag — set true during profile switching to suppress autosave.
 const isSwitchingRef = { value: false }
 
-function formatDateTime(d: Date): string {
-  const y = d.getFullYear()
-  const mo = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${y}-${mo}-${dd} ${h}:${mi}`
-}
-
 // ─── Autosave ───────────────────────────────────────────────────────────────
 
 async function autosave(): Promise<void> {
@@ -74,6 +63,9 @@ const debouncedAutosave = debounce(autosave as () => void, 500)
 
 const tabUrls = new Map<number, string>()
 
+// Serializes closed-tab writes so concurrent onRemoved events don't race.
+let closedTabQueue = Promise.resolve()
+
 chrome.tabs.onCreated.addListener(tab => {
   if (tab.id && tab.url) tabUrls.set(tab.id, tab.url)
   debouncedAutosave()
@@ -84,7 +76,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   debouncedAutosave()
 })
 
-chrome.tabs.onRemoved.addListener(async (tabId) => {
+chrome.tabs.onRemoved.addListener((tabId) => {
   if (isSwitchingRef.value) {
     tabUrls.delete(tabId)
     return
@@ -94,16 +86,10 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   tabUrls.delete(tabId)
 
   if (url && !url.startsWith('chrome-extension://') && !url.startsWith('chrome://')) {
-    const index = await getIndex()
-    if (index) {
-      const profile = await getProfile(index.activeProfileId)
-      const settings = await getSettings()
-      if (profile) {
-        const entry: ClosedTab = { url, closedAt: formatDateTime(new Date()) }
-        const closedTabs = [entry, ...profile.closedTabs].slice(0, settings.closedTabsLimit)
-        await setProfile({ ...profile, closedTabs })
-      }
-    }
+    closedTabQueue = closedTabQueue.then(async () => {
+      const index = await getIndex()
+      if (index) await addClosedTab(index.activeProfileId, url)
+    })
   }
 
   debouncedAutosave()
@@ -146,12 +132,24 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 // ─── Profile switching ──────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SWITCH_PROFILE') {
+    // Content script senders (quickswitcher) have sender.tab set. Their tab will
+    // be closed during the switch, so keeping the channel open causes Chrome to
+    // log "message channel closed before a response was received". Return false
+    // to close the port immediately; the switch still runs fire-and-forget.
+    const fromContentScript = !!sender.tab
     handleSwitchProfile(message.profileId as string)
       .then(() => sendResponse({ success: true }))
       .catch(err => sendResponse({ success: false, error: String(err) }))
-    return true // keep channel open for async response
+    return fromContentScript ? false : true
+  }
+
+  if (message.type === 'DELETE_PROFILE') {
+    handleDeleteProfile(message.profileId as string)
+      .then(() => sendResponse({ success: true }))
+      .catch(err => sendResponse({ success: false, error: String(err) }))
+    return true
   }
 
   if (message.type === 'GET_INDEX') {
@@ -193,6 +191,37 @@ async function handleSwitchProfile(profileId: string): Promise<void> {
   } finally {
     // Step 9
     isSwitchingRef.value = false
+  }
+}
+
+async function handleDeleteProfile(profileId: string): Promise<void> {
+  const index = await getIndex()
+  if (!index) throw new Error('No profiles index found')
+
+  const entry = index.profiles.find(p => p.id === profileId)
+  if (entry?.name === 'Default') throw new Error('Cannot delete Default profile')
+  if (index.profiles.length <= 1) throw new Error('Cannot delete the only profile')
+
+  if (index.activeProfileId === profileId) {
+    const defaultEntry = index.profiles.find(p => p.name === 'Default')
+    if (!defaultEntry) throw new Error('Default profile not found')
+    const defaultProfile = await getProfile(defaultEntry.id)
+    if (!defaultProfile) throw new Error('Default profile data not found')
+
+    isSwitchingRef.value = true
+    try {
+      // Switch to Default without saving current profile (it's being deleted).
+      // restoreProfile will close all tabs including the options page — the delete
+      // below still runs because we're in the background service worker.
+      await restoreProfile(defaultProfile)
+      await chrome.storage.local.remove(`tabglider:profile:${profileId}`)
+      const remaining = index.profiles.filter(p => p.id !== profileId)
+      await setIndex({ ...index, profiles: remaining, activeProfileId: defaultEntry.id })
+    } finally {
+      isSwitchingRef.value = false
+    }
+  } else {
+    await deleteProfile(profileId)
   }
 }
 
