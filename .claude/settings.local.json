@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse | Select-Object -First 100 | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\\\\src\" -Recurse -File | ForEach-Object { $_.FullName })",
+      "PowerShell(ls *)",
+      "PowerShell(Get-ChildItem \"C:\\\\dev\\\\TabGlider\" | ForEach-Object { $_.Name })",
+      "PowerShell(Get-ChildItem \"C:\\\\dev\\\\TabGlider\\\\src\" -Recurse | ForEach-Object { $_.FullName } | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Exclude node_modules,dist -Recurse -Force | Where-Object {$_.PSIsContainer -eq $false} | Select-Object -ExpandProperty FullName | Sort-Object)",
+      "Bash(npm run *)"
+    ]
+  }
+}

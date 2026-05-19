@@ -1,0 +1,15 @@
+---
+description: Svelte 5 runes rules for TabGlider
+globs: ["src/**/*.svelte"]
+---
+
+# Svelte 5 Rules
+
+- Use `$state`, `$derived`, `$effect` — never legacy `$:` reactive declarations or `writable`/`readable` stores.
+- No Svelte stores (`svelte/store`). All reactive state is local runes or passed via props.
+- Component props via `$props()`: `const { foo, bar }: { foo: string; bar: number } = $props()`.
+- Mount components with `import { mount, unmount } from 'svelte'` — never `new Component(...)`.
+- No UI component libraries. Plain Svelte + CSS only.
+- Scoped `<style>` blocks in every component. Global resets go in `:global(*)` inside the component that owns the root element.
+- `$effect` callbacks should not return values other than a cleanup function. Async work inside `$effect` should be a local async function called immediately.
+- `$derived` expressions must be pure — no side effects, no awaits.

@@ -1,0 +1,14 @@
+---
+description: TabGlider architectural constraints
+globs: ["src/**/*.ts", "src/**/*.svelte"]
+---
+
+# Architecture Rules
+
+- All `chrome.storage` access must go through `src/lib/storage/` — never call `chrome.storage` directly in UI or background.
+- All `chrome.tabs` and `chrome.tabGroups` access must go through `src/lib/tabs/` — never in UI components.
+- Svelte components (`.svelte` files) must never call `chrome.*` directly. Use `chrome.runtime.sendMessage` to delegate to background, or call lib functions.
+- Storage keys must always use the `tabglider:` prefix.
+- The `isSwitching` guard must wrap all autosave handlers in `background/index.ts`. When `isSwitchingRef.value === true`, return early from every autosave code path.
+- Profile IDs are slugified names (lowercase, hyphens). Never use Chrome's numeric tab/group IDs as persistent identifiers.
+- Internal group refs are UUIDs (`crypto.randomUUID()`). Map between UUID refs and Chrome numeric IDs only within a single switching operation.

@@ -1,0 +1,14 @@
+---
+description: Chrome API usage rules for TabGlider
+globs: ["src/**/*.ts"]
+---
+
+# Chrome API Rules
+
+- Use `chrome.tabGroups` for all group operations — never manipulate group state indirectly.
+- Never persist Chrome's numeric tab IDs or group IDs. They are ephemeral and only valid within a single browser session.
+- Every `chrome.storage` call must be `await`ed and wrapped in `try/catch`. Log errors with `console.error` — never silently swallow them.
+- `chrome.tabs.group({ tabIds })` creates a new group. Subsequent `chrome.tabGroups.update(id, { title, color })` sets its properties.
+- Pinned tabs cannot be grouped. Filter them out before calling `chrome.tabs.group()`.
+- `chrome.tabGroups.TAB_GROUP_ID_NONE` (-1) is the sentinel for "no group". Always compare with `!==` not `> 0`.
+- When querying tabs/groups for the current window use `chrome.windows.getCurrent()` then pass `windowId` explicitly — do not rely on `chrome.windows.WINDOW_ID_CURRENT` in service workers where it may not resolve correctly.

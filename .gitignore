@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# Cursor — ignore everything except rules
+.cursor/*
+!.cursor/rules/
+
+# Environment
+.env
+.env.*
+
+# OS
+Thumbs.db
