@@ -18,6 +18,9 @@
   let limitDirty = $state(false);
   let flash = $state<{ ok: boolean; msg: string } | null>(null);
   let shortcut = $state("");
+  let overlay = $state<HTMLDivElement | null>(null);
+  let textarea = $state<HTMLTextAreaElement | null>(null);
+  let ctrlHeld = $state(false);
 
   let isDirty = $derived(editorText !== savedText || limitDirty);
 
@@ -29,6 +32,32 @@
 
   $effect(() => {
     void init();
+  });
+
+  $effect(() => {
+    updateOverlay();
+  });
+
+  $effect(() => {
+    if (!textarea) return;
+    const ro = new ResizeObserver(updateOverlay);
+    ro.observe(textarea);
+    return () => ro.disconnect();
+  });
+
+  $effect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Control') ctrlHeld = true; };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Control') ctrlHeld = false; };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  });
+
+  $effect(() => {
+    if (!ctrlHeld && textarea) textarea.style.cursor = '';
   });
 
   async function init() {
@@ -241,6 +270,44 @@
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   }
 
+  function updateOverlay() {
+    if (!overlay || !textarea) return;
+    overlay.style.width = textarea.clientWidth + 'px';
+    overlay.style.height = textarea.clientHeight + 'px';
+    const escaped = editorText
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const highlighted = escaped.replace(
+      /(https?:\/\/[^\s|&\[\]]+)/g,
+      '<mark class="url-highlight">$1</mark>'
+    );
+    overlay.innerHTML = highlighted;
+  }
+
+  function syncScroll() {
+    if (overlay && textarea) overlay.scrollTop = textarea.scrollTop;
+  }
+
+  function handleMouseMove(e: MouseEvent) {
+    if (!ctrlHeld || !overlay || !textarea) return;
+    overlay.style.pointerEvents = 'auto';
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    overlay.style.pointerEvents = 'none';
+    textarea.style.cursor = el?.classList.contains('url-highlight') ? 'pointer' : 'text';
+  }
+
+  function handleClick(e: MouseEvent) {
+    if (!e.ctrlKey || !textarea) return;
+    const pos = textarea.selectionStart;
+    const text = editorText;
+    const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+    const lineEnd = text.indexOf('\n', pos);
+    const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+    const match = line.match(/https?:\/\/[^\s|\[\]]+/);
+    if (match) chrome.tabs.create({ url: match[0] });
+  }
+
 </script>
 
 <main>
@@ -350,9 +417,18 @@
               <span class="unsaved-dot">● Unsaved changes</span>
             {/if}
           </div>
-          <textarea class="md-editor" spellcheck="false" wrap="off" bind:value={editorText}
-          ></textarea>
+          <div class="editor-wrap">
+            <div class="url-overlay" class:ctrl-active={ctrlHeld} bind:this={overlay}></div>
+            <textarea class="md-editor" spellcheck="false" wrap="off" bind:value={editorText}
+              bind:this={textarea}
+              onscroll={syncScroll}
+              onclick={handleClick}
+              onmousemove={handleMouseMove}
+            ></textarea>
+          </div>
         </div>
+
+        <p class="editor-hint">Ctrl+Click on a URL to open in new tab</p>
 
         <div class="action-bar">
           <label class="btn btn-secondary file-btn">
@@ -792,6 +868,45 @@
     color: LinkText;
   }
 
+  .editor-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .url-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    overflow: hidden;
+    color: transparent;
+    background: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: "Menlo", "Consolas", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.75;
+    padding: 18px 20px;
+    border: none;
+    box-sizing: border-box;
+  }
+
+  :global(.url-highlight) {
+    background: color-mix(in srgb, LinkText 15%, transparent);
+    border-radius: 3px;
+    padding: 2px 3px;
+    margin: -2px -3px;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .url-overlay.ctrl-active :global(.url-highlight) {
+    opacity: 1;
+  }
+
   .md-editor {
     flex: 1;
     padding: 18px 20px;
@@ -807,6 +922,13 @@
     box-sizing: border-box;
     overflow-x: auto;
     overflow-y: auto;
+  }
+
+  .editor-hint {
+    font-size: 11px;
+    color: GrayText;
+    margin: 0;
+    flex-shrink: 0;
   }
 
   /* ── Action bar ── */
