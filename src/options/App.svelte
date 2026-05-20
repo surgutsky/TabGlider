@@ -350,7 +350,7 @@
               <span class="unsaved-dot">● Unsaved changes</span>
             {/if}
           </div>
-          <textarea class="md-editor" spellcheck="false" bind:value={editorText}
+          <textarea class="md-editor" spellcheck="false" wrap="off" bind:value={editorText}
           ></textarea>
         </div>
 
@@ -766,7 +766,7 @@
     flex-direction: column;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
-    overflow: hidden;
+    overflow: clip;
     min-height: 0;
   }
 
@@ -794,7 +794,6 @@
 
   .md-editor {
     flex: 1;
-    min-height: 380px;
     padding: 18px 20px;
     font-family: "Menlo", "Consolas", "Courier New", monospace;
     font-size: 13px;
@@ -805,6 +804,9 @@
     background: Canvas;
     color: CanvasText;
     width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: auto;
   }
 
   /* ── Action bar ── */
