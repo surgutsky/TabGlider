@@ -4,6 +4,26 @@
   import ProfileList from "../components/ProfileList.svelte";
   import ClosedTabsList from "../components/ClosedTabsList.svelte";
 
+  function sendMessageWithTimeout(
+    message: unknown,
+    timeoutMs = 10000
+  ): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Switch timed out'))
+      }, timeoutMs)
+
+      chrome.runtime.sendMessage(message, (response) => {
+        clearTimeout(timer)
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message))
+        } else {
+          resolve(response)
+        }
+      })
+    })
+  }
+
   let index = $state<ProfilesIndex | null>(null);
   let closedTabs = $state<ClosedTab[]>([]);
   let isSwitching = $state(false);
@@ -59,11 +79,14 @@
     isSwitching = true;
     error = "";
     try {
-      const res = await chrome.runtime.sendMessage({
+      const response = await sendMessageWithTimeout({
         type: "SWITCH_PROFILE",
         profileId,
       });
-      if (!res?.success) throw new Error(res?.error ?? "Switch failed");
+      if (!response?.ok) {
+        error = response?.error ?? "Failed to switch profile";
+        return;
+      }
       await loadAll();
     } catch (e) {
       error = String(e);
@@ -117,7 +140,10 @@
 
 <main>
   {#if error}
-    <p class="error-msg" role="alert">{error}</p>
+    <div class="error-banner" role="alert">
+      ⚠ {error}
+      <button onclick={() => error = ''}>✕</button>
+    </div>
   {/if}
 
   <section>
@@ -145,6 +171,7 @@
   <section class="closed-section">
     <ClosedTabsList {closedTabs} onreopen={reopenTab} onclear={clearClosedTabs} />
   </section>
+
 </main>
 
 <style>
@@ -259,12 +286,26 @@
     border-color: LinkText;
   }
 
-  .error-msg {
-    margin: 0;
-    font-size: 12px;
-    color: red;
-    border-left: 2px solid red;
-    padding: 3px 8px;
+  .error-banner {
+    background: color-mix(in srgb, red 10%, Canvas);
+    border: 1px solid color-mix(in srgb, red 30%, Canvas);
+    color: CanvasText;
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .error-banner button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-size: 14px;
+    padding: 0 0 0 8px;
+    line-height: 1;
   }
 
   .muted {

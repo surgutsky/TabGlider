@@ -5,22 +5,25 @@
     getProfile,
     setProfile,
   } from "../lib/storage";
-  import { getSettings, setSettings } from "../lib/storage";
   import { serializeProfile } from "../lib/md/serializer";
   import { parseProfile } from "../lib/md/parser";
-  import type { Profile, ProfilesIndex, Settings } from "../lib/types";
+  import type { Profile, ProfilesIndex } from "../lib/types";
 
   let index = $state<ProfilesIndex | null>(null);
   let selectedId = $state<string | null>(null);
   let selectedProfile = $state<Profile | null>(null);
   let editorText = $state("");
   let savedText = $state("");
-  let settings = $state<Settings>({ closedTabsLimit: 200 });
+  let closedTabsLimit = $state(200);
+  let limitDirty = $state(false);
   let flash = $state<{ ok: boolean; msg: string } | null>(null);
-  let settingsFlash = $state<{ ok: boolean; msg: string } | null>(null);
   let shortcut = $state("");
 
-  let isDirty = $derived(editorText !== savedText);
+  let isDirty = $derived(editorText !== savedText || limitDirty);
+
+  function markDirty() {
+    limitDirty = true;
+  }
   let profileName = $derived(editorText.match(/^# (.+)$/m)?.[1]?.trim() ?? "");
   let isDefaultProfile = $derived(selectedProfile?.name === 'Default');
 
@@ -29,13 +32,11 @@
   });
 
   async function init() {
-    const [idx, s, commands] = await Promise.all([
+    const [idx, commands] = await Promise.all([
       getIndex(),
-      getSettings(),
       chrome.commands.getAll(),
     ]);
     index = idx;
-    settings = s;
     shortcut =
       commands.find((c) => c.name === "open-quick-switcher")?.shortcut ??
       "Not set";
@@ -52,7 +53,9 @@
       const text = serializeProfile(profile);
       editorText = text;
       savedText = text;
+      closedTabsLimit = profile.closedTabsLimit ?? 200;
     }
+    limitDirty = false;
     flash = null;
   }
 
@@ -85,6 +88,7 @@
       updatedAt: today,
       windows: [],
       closedTabs: [],
+      closedTabsLimit: 200,
     };
     await setProfile(newProfile);
     if (index) {
@@ -149,6 +153,7 @@
         ...parsed,
         id: selectedProfile.id,
         updatedAt: today,
+        closedTabsLimit,
       };
       await setProfile(updated);
       if (index) {
@@ -163,6 +168,7 @@
       const text = serializeProfile(updated);
       editorText = text;
       savedText = text;
+      limitDirty = false;
       flash = { ok: true, msg: "Saved!" };
       setTimeout(() => {
         flash = null;
@@ -174,6 +180,8 @@
 
   function discardChanges() {
     editorText = savedText;
+    closedTabsLimit = selectedProfile?.closedTabsLimit ?? 200;
+    limitDirty = false;
     flash = null;
   }
 
@@ -212,18 +220,6 @@
     chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   }
 
-  async function saveSettings() {
-    settingsFlash = null;
-    try {
-      await setSettings(settings);
-      settingsFlash = { ok: true, msg: "Saved!" };
-      setTimeout(() => {
-        settingsFlash = null;
-      }, 2000);
-    } catch (e) {
-      settingsFlash = { ok: false, msg: String(e) };
-    }
-  }
 </script>
 
 <main>
@@ -292,19 +288,6 @@
       <div class="divider"></div>
 
       <div class="section-label">Settings</div>
-      <div class="settings-field">
-        <label class="settings-label" for="closed-limit"
-          >Closed tabs limit</label
-        >
-        <input
-          id="closed-limit"
-          type="number"
-          min="0"
-          max="1000"
-          bind:value={settings.closedTabsLimit}
-          class="number-input"
-        />
-      </div>
       <div class="setting-row">
         <span class="setting-label">Quick Switcher</span>
         <div class="shortcut-row">
@@ -312,14 +295,6 @@
           <button onclick={openShortcuts}>Change</button>
         </div>
       </div>
-      <button class="btn settings-save" onclick={saveSettings}
-        >Save settings</button
-      >
-      {#if settingsFlash}
-        <span class={settingsFlash.ok ? "flash-ok" : "flash-err"}
-          >{settingsFlash.msg}</span
-        >
-      {/if}
     </aside>
 
     <section class="editor-panel">
@@ -333,6 +308,19 @@
           readonly={isDefaultProfile}
           title={isDefaultProfile ? 'Default profile name cannot be changed' : undefined}
         />
+
+        <div class="profile-meta">
+          <label>
+            <span>Recently closed limit</span>
+            <input
+              type="number"
+              min="10"
+              max="500"
+              bind:value={closedTabsLimit}
+              onchange={markDirty}
+            />
+          </label>
+        </div>
 
         <div class="editor-card">
           <div class="card-toolbar">
@@ -723,6 +711,32 @@
   .name-input:read-only {
     opacity: 0.55;
     cursor: default;
+  }
+
+  .profile-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+    color: GrayText;
+    flex-shrink: 0;
+  }
+
+  .profile-meta label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .profile-meta input {
+    width: 64px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: Field;
+    color: FieldText;
+    font-size: 13px;
+    text-align: center;
   }
 
   .editor-card {

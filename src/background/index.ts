@@ -134,15 +134,10 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SWITCH_PROFILE') {
-    // Content script senders (quickswitcher) have sender.tab set. Their tab will
-    // be closed during the switch, so keeping the channel open causes Chrome to
-    // log "message channel closed before a response was received". Return false
-    // to close the port immediately; the switch still runs fire-and-forget.
-    const fromContentScript = !!sender.tab
     handleSwitchProfile(message.profileId as string)
-      .then(() => sendResponse({ success: true }))
-      .catch(err => sendResponse({ success: false, error: String(err) }))
-    return fromContentScript ? false : true
+      .then(() => sendResponse({ ok: true }))
+      .catch(err => sendResponse({ ok: false, error: String(err) }))
+    return true
   }
 
   if (message.type === 'DELETE_PROFILE') {
@@ -188,6 +183,13 @@ async function handleSwitchProfile(profileId: string): Promise<void> {
 
     // Step 10: update active profile id
     await setIndex({ ...index, activeProfileId: profileId })
+  } catch (err) {
+    try {
+      await chrome.tabs.create({ url: 'chrome://newtab' })
+    } catch {
+      // ignore if we can't even open a new tab
+    }
+    throw err
   } finally {
     // Step 9
     isSwitchingRef.value = false

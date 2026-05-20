@@ -1,6 +1,6 @@
 import type { Profile, SavedTab, SavedGroup, SavedWindow, ClosedTab } from '../types'
 
-type PartialProfile = Omit<Profile, 'id'>
+type PartialProfile = Omit<Profile, 'id' | 'closedTabsLimit'>
 
 const VALID_COLORS = new Set([
   'grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange',

@@ -1,8 +1,27 @@
 <script lang="ts">
-  import { getIndex, setIndex, setProfile } from "../lib/storage";
-  import type { Profile } from "../lib/types";
+  import { getIndex } from "../lib/storage";
 
   const { onclose }: { onclose: () => void } = $props();
+
+  function sendMessageWithTimeout(
+    message: unknown,
+    timeoutMs = 10000
+  ): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Switch timed out'))
+      }, timeoutMs)
+
+      chrome.runtime.sendMessage(message, (response) => {
+        clearTimeout(timer)
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message))
+        } else {
+          resolve(response)
+        }
+      })
+    })
+  }
 
   let profiles = $state<Array<{ id: string; name: string; createdAt: string }>>(
     [],
@@ -11,14 +30,15 @@
   let search = $state("");
   let selectedIdx = $state(0);
   let isSwitching = $state(false);
-  let newProfileMode = $state(false);
-  let newProfileName = $state("");
+  let error = $state("");
 
   $effect(() => {
     getIndex().then((idx) => {
       if (idx) {
         profiles = idx.profiles;
         activeProfileId = idx.activeProfileId;
+        const i = idx.profiles.findIndex((p) => p.id === idx.activeProfileId);
+        selectedIdx = i >= 0 ? i : 0;
       }
     });
   });
@@ -34,33 +54,18 @@
 
   async function switchTo(id: string) {
     isSwitching = true;
-    chrome.runtime.sendMessage({ type: "SWITCH_PROFILE", profileId: id });
-    onclose();
-  }
-
-  async function createAndSwitch() {
-    const name = newProfileName.trim();
-    if (!name) return;
-    isSwitching = true;
-    const id = crypto.randomUUID();
-    const today = new Date().toISOString().slice(0, 10);
-    const profile: Profile = {
-      id,
-      name,
-      createdAt: today,
-      updatedAt: today,
-      windows: [],
-      closedTabs: [],
-    };
-    await setProfile(profile);
-    const idx = await getIndex();
-    if (idx) {
-      await setIndex({
-        ...idx,
-        profiles: [...idx.profiles, { id, name, createdAt: today }],
-      });
+    error = '';
+    try {
+      const response = await sendMessageWithTimeout({ type: 'SWITCH_PROFILE', profileId: id });
+      if (!response?.ok) {
+        isSwitching = false;
+        error = response?.error ?? 'Failed to switch profile';
+        return;
+      }
+    } catch {
+      // channel closed = tab was closed during switch (success)
+      return;
     }
-    chrome.runtime.sendMessage({ type: "SWITCH_PROFILE", profileId: id });
     onclose();
   }
 
@@ -71,22 +76,11 @@
   function handleKeydown(e: KeyboardEvent) {
     if (isSwitching) return;
 
-    if (newProfileMode) {
-      if (e.key === "Escape") {
-        newProfileMode = false;
-        newProfileName = "";
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        createAndSwitch();
-      }
-      return;
-    }
-
     if (e.key === "Escape") {
       onclose();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      selectedIdx = Math.min(selectedIdx + 1, filtered.length);
+      selectedIdx = Math.min(selectedIdx + 1, filtered.length - 1);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectedIdx = Math.max(selectedIdx - 1, 0);
@@ -94,9 +88,6 @@
       e.preventDefault();
       if (selectedIdx < filtered.length) {
         switchTo(filtered[selectedIdx].id);
-      } else {
-        newProfileName = search;
-        newProfileMode = true;
       }
     }
   }
@@ -133,15 +124,6 @@
         <div class="spinner"></div>
         <span>Switching…</span>
       </div>
-    {:else if newProfileMode}
-      <input
-        class="search-input"
-        type="text"
-        placeholder="New profile name…"
-        bind:value={newProfileName}
-        use:autofocusAction
-      />
-      <p class="hint">Enter to create · Esc to cancel</p>
     {:else}
       <input
         class="search-input"
@@ -171,17 +153,9 @@
           <li class="empty" role="status">No profiles match</li>
         {/if}
       </ul>
-      <button
-        class="new-profile-btn"
-        class:selected={selectedIdx === filtered.length}
-        onclick={() => {
-          newProfileName = search;
-          newProfileMode = true;
-        }}
-      >
-        <span class="new-plus">+</span>
-        <span>New profile</span>
-      </button>
+      {#if error}
+        <p class="qs-error">⚠ {error}</p>
+      {/if}
       <p class="hint">↑↓ navigate · Enter select · Esc close</p>
     {/if}
   </div>
@@ -207,6 +181,7 @@
     --accent-hover: color-mix(in srgb, LinkText 85%, CanvasText);
     --accent-subtle: color-mix(in srgb, LinkText 10%, Canvas);
     --accent-subtle-hover: color-mix(in srgb, LinkText 18%, Canvas);
+    --accent-muted: color-mix(in srgb, LinkText 70%, Canvas);
     --border: rgba(0, 0, 0, 0.08);
     --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -332,16 +307,17 @@
     background: var(--accent-subtle);
   }
   li.active-profile button {
-    color: LinkText;
-    font-weight: 600;
-  }
-  li.selected button {
     background: var(--accent-subtle);
     color: LinkText;
     font-weight: 600;
   }
-  li.selected .dot {
-    background: LinkText;
+  li.selected:not(.active-profile) button {
+    background: var(--accent-subtle);
+    color: var(--accent-muted);
+    font-weight: 400;
+  }
+  li.selected:not(.active-profile) .dot {
+    background: var(--accent-muted);
   }
 
   .dot {
@@ -373,42 +349,11 @@
     text-align: center;
   }
 
-  .new-profile-btn {
-    width: 100%;
-    margin-top: 8px;
-    border: 1.5px dashed color-mix(in srgb, LinkText 35%, Canvas);
-    border-radius: var(--radius-md);
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    color: LinkText;
-    font-size: 14px;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
-    background: none;
-    box-sizing: border-box;
-    text-align: left;
-    transition:
-      background 0.15s,
-      border-color 0.15s;
-  }
-  .new-profile-btn:hover,
-  .new-profile-btn.selected {
-    background: var(--accent-subtle);
-    border-color: LinkText;
-  }
-
-  .new-plus {
-    width: 16px;
-    flex-shrink: 0;
-    font-size: 16px;
-    font-weight: 600;
-    text-align: center;
-    line-height: 1;
+  .qs-error {
+    color: red;
+    font-size: 12px;
+    padding: 8px 16px;
+    margin: 0;
   }
 
   .hint {

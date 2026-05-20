@@ -28,7 +28,8 @@ export interface Profile {
   createdAt: string        // "YYYY-MM-DD"
   updatedAt: string        // "YYYY-MM-DD"
   windows: SavedWindow[]
-  closedTabs: ClosedTab[]  // max 200, FIFO
+  closedTabs: ClosedTab[]  // max closedTabsLimit entries, FIFO
+  closedTabsLimit: number  // default 200
 }
 
 export interface ProfilesIndex {
@@ -36,6 +37,4 @@ export interface ProfilesIndex {
   profiles: Array<{ id: string; name: string; createdAt: string }>
 }
 
-export interface Settings {
-  closedTabsLimit: number  // default 200
-}
+export interface Settings {}

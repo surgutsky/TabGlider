@@ -1,5 +1,4 @@
 import type { ClosedTab, Profile, ProfilesIndex } from '../types'
-import { getSettings } from './settings'
 
 const INDEX_KEY = 'tabglider:index'
 const profileKey = (id: string) => `tabglider:profile:${id}`
@@ -95,13 +94,13 @@ export async function patchProfile(id: string, patch: Partial<Profile>): Promise
 export async function addClosedTab(profileId: string, url: string): Promise<void> {
   if (!url || url.startsWith('chrome://') || url.startsWith('about:')) return
   try {
-    const [profile, settings] = await Promise.all([getProfile(profileId), getSettings()])
+    const profile = await getProfile(profileId)
     if (!profile) return
     const closedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
     const entry: ClosedTab = { url, closedAt }
     const deduped = profile.closedTabs.filter(t => t.url !== url)
     const closedTabs = [entry, ...deduped]
-    if (closedTabs.length > settings.closedTabsLimit) closedTabs.pop()
+    if (closedTabs.length > (profile.closedTabsLimit ?? 200)) closedTabs.pop()
     await setProfile({ ...profile, closedTabs })
   } catch (e) {
     console.error(`Failed to add closed tab for profile ${profileId}`, e)
@@ -121,6 +120,7 @@ export async function initDefaultProfile(): Promise<void> {
       updatedAt: today,
       windows: [],
       closedTabs: [],
+      closedTabsLimit: 200,
     }
     const index: ProfilesIndex = {
       activeProfileId: id,
