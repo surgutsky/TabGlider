@@ -57,7 +57,7 @@ async function autosave(): Promise<void> {
   await setProfile(patchProfile(profile, windows))
 }
 
-const debouncedAutosave = debounce(autosave as () => void, 500)
+const debouncedAutosave = debounce(autosave as () => void, 150)
 
 // ─── Tab URL tracking (needed for closedTabs on removal) ────────────────────
 
