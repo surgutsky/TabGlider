@@ -3,38 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Switching profile…</title>
-  <script type="module" src="./main.ts"></script>
+  <title>TabGlider</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { color-scheme: light dark; }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
+      font-family: system-ui, sans-serif;
+      background: Canvas;
+      color: CanvasText;
+      min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      background: #111;
-      color: #ccc;
-      font-family: system-ui, sans-serif;
+      gap: 14px;
+      animation: fadein 0.2s ease-out;
     }
-    .card {
-      text-align: center;
+
+    @keyframes fadein {
+      from { opacity: 0; }
+      to   { opacity: 1; }
     }
-    h1 { font-size: 18px; font-weight: 400; margin-bottom: 8px; }
+
+    .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+    }
+
+    .app-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: CanvasText;
+    }
+
+    .label {
+      font-size: 14px;
+      color: GrayText;
+      margin-top: 8px;
+    }
+
+    .profile-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: LinkText;
+    }
+
     .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid #333;
-      border-top-color: #4a9eff;
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(0,0,0,0.08);
+      border-top-color: LinkText;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      margin: 0 auto;
+      animation: spin 0.8s linear infinite;
+      margin-top: 8px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-color-scheme: dark) {
+      .spinner {
+        border-color: rgba(255,255,255,0.07);
+        border-top-color: LinkText;
+      }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="spinner"></div>
-    <h1>Switching profile…</h1>
-  </div>
+  <img class="logo" src="../../../icons/icon48.png" alt="TabGlider" />
+  <div class="app-name">TabGlider</div>
+  <div class="label">Switching to</div>
+  <div class="profile-name" id="profile-name">...</div>
+  <div class="spinner"></div>
+
+  <script src="./init.js"></script>
 </body>
 </html>

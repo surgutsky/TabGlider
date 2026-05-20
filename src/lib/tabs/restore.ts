@@ -2,7 +2,7 @@ import type { Profile, SavedWindow } from '../types'
 
 // After crxjs build the switching page lands at switching/index.html.
 // Verify this path matches the built output on first run.
-const SWITCHING_PAGE = 'switching/index.html'
+const SWITCHING_PAGE = 'src/switching/index.html'
 
 async function restoreWindow(savedWindow: SavedWindow, targetWindowId: number): Promise<number | undefined> {
   const { tabs, groups } = savedWindow
@@ -86,8 +86,9 @@ export async function restoreProfile(profile: Profile): Promise<void> {
   // Step 3: open switching page in first window as visual anchor
   let switchingTabId: number
   try {
+    const switchingUrl = chrome.runtime.getURL(SWITCHING_PAGE) + `#${encodeURIComponent(profile.name)}`
     const switchingTab = await chrome.tabs.create({
-      url: chrome.runtime.getURL(SWITCHING_PAGE),
+      url: switchingUrl,
       windowId: firstWinId,
       active: true,
     })
