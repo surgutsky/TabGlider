@@ -46,7 +46,7 @@
             height="16"
             onerror={hideBrokenFavicon}
           />
-          <span class="url">{tab.url}</span>
+          <span class="url">{tab.title ?? tab.url}</span>
           <span class="time">{tab.closedAt.slice(11)}</span>
         </button>
       </li>

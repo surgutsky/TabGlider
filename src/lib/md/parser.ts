@@ -68,7 +68,11 @@ export function parseProfile(md: string): PartialProfile {
     if (inClosedTabs) {
       if (line.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}, /)) {
         const commaIdx = line.indexOf(', ')
-        closedTabs.push({ url: line.slice(commaIdx + 2), closedAt: line.slice(0, commaIdx) })
+        const rest = line.slice(commaIdx + 2)
+        const pipeIdx = rest.indexOf(' | ')
+        const url = pipeIdx !== -1 ? rest.slice(0, pipeIdx) : rest
+        const title = pipeIdx !== -1 ? rest.slice(pipeIdx + 3).trim() || undefined : undefined
+        closedTabs.push({ url, title, closedAt: line.slice(0, commaIdx) })
       }
       continue
     }
@@ -105,9 +109,12 @@ export function parseProfile(md: string): PartialProfile {
 
     if (line.startsWith('http://') || line.startsWith('https://')) {
       const win = ensureWindow()
-      const pinned = line.endsWith(' [pinned]')
-      const url = pinned ? line.slice(0, -' [pinned]'.length) : line
-      win.tabs.push({ url, groupRef: currentGroupRef, pinned })
+      const pipeIdx = line.indexOf(' | ')
+      const urlPart = pipeIdx !== -1 ? line.slice(0, pipeIdx) : line
+      const title = pipeIdx !== -1 ? line.slice(pipeIdx + 3).trim() || undefined : undefined
+      const pinned = urlPart.endsWith(' [pinned]')
+      const url = pinned ? urlPart.slice(0, -' [pinned]'.length) : urlPart
+      win.tabs.push({ url, title, groupRef: currentGroupRef, pinned })
       continue
     }
   }

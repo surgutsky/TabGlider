@@ -96,6 +96,7 @@ const debouncedAutosave = debounce(autosave as () => void, 150)
 // ─── Tab URL tracking (needed for closedTabs on removal) ────────────────────
 
 const tabUrls = new Map<number, string>()
+const tabTitles = new Map<number, string>()
 
 // Serializes closed-tab writes so concurrent onRemoved events don't race.
 let closedTabQueue = Promise.resolve()
@@ -104,27 +105,32 @@ chrome.tabs.onCreated.addListener((tab) => {
   if (isSwitchingRef.value) return
   const url = tab.pendingUrl ?? tab.url ?? ''
   if (tab.id && url) tabUrls.set(tab.id, url)
+  if (tab.id && tab.title) tabTitles.set(tab.id, tab.title)
   debouncedAutosave()
 })
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (tab.url) tabUrls.set(tabId, tab.url)
+  if (tab.title) tabTitles.set(tabId, tab.title)
   debouncedAutosave()
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (isSwitchingRef.value) {
     tabUrls.delete(tabId)
+    tabTitles.delete(tabId)
     return
   }
 
   const url = tabUrls.get(tabId)
+  const title = tabTitles.get(tabId)
   tabUrls.delete(tabId)
+  tabTitles.delete(tabId)
 
   if (url && !url.startsWith('chrome-extension://') && !url.startsWith('chrome://')) {
     closedTabQueue = closedTabQueue.then(async () => {
       const index = await getIndex()
-      if (index) await addClosedTab(index.activeProfileId, url)
+      if (index) await addClosedTab(index.activeProfileId, url, title)
     })
   }
 

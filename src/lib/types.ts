@@ -1,5 +1,6 @@
 export interface SavedTab {
   url: string
+  title?: string
   groupRef: string | null  // internal UUID ref to SavedGroup
   pinned: boolean
 }
@@ -24,6 +25,7 @@ export interface SavedWindow {
 
 export interface ClosedTab {
   url: string
+  title?: string
   closedAt: string         // "YYYY-MM-DD HH:mm"
 }
 

@@ -29,7 +29,7 @@ export function serializeProfile(profile: Profile): string {
         }
       }
 
-      lines.push(`${tab.url}${tab.pinned ? ' [pinned]' : ''}`)
+      lines.push(`${tab.url}${tab.pinned ? ' [pinned]' : ''}${tab.title ? ` | ${tab.title}` : ''}`)
     }
   }
 
@@ -37,7 +37,7 @@ export function serializeProfile(profile: Profile): string {
     lines.push('')
     lines.push('# Closed Tabs')
     for (const ct of profile.closedTabs) {
-      lines.push(`${ct.closedAt}, ${ct.url}`)
+      lines.push(`${ct.closedAt}, ${ct.url}${ct.title ? ` | ${ct.title}` : ''}`)
     }
   }
 

@@ -91,13 +91,13 @@ export async function patchProfile(id: string, patch: Partial<Profile>): Promise
   }
 }
 
-export async function addClosedTab(profileId: string, url: string): Promise<void> {
+export async function addClosedTab(profileId: string, url: string, title?: string): Promise<void> {
   if (!url || url.startsWith('chrome://') || url.startsWith('about:')) return
   try {
     const profile = await getProfile(profileId)
     if (!profile) return
     const closedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
-    const entry: ClosedTab = { url, closedAt }
+    const entry: ClosedTab = { url, ...(title ? { title } : {}), closedAt }
     const deduped = profile.closedTabs.filter(t => t.url !== url)
     const closedTabs = [entry, ...deduped]
     if (closedTabs.length > (profile.closedTabsLimit ?? 200)) closedTabs.pop()

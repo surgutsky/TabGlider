@@ -43,6 +43,7 @@ async function captureWindow(winId: number): Promise<SavedWindow> {
     })
     .map(t => ({
       url: t.pendingUrl ?? t.url ?? '',
+      title: t.title || undefined,
       groupRef:
         t.groupId !== undefined && t.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE
           ? (groupRefMap.get(t.groupId) ?? null)
