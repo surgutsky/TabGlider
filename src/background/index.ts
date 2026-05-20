@@ -205,7 +205,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'SWITCH_PROFILE') {
-    handleSwitchProfile(message.profileId as string)
+    handleSwitchProfile(message.profileId as string, message.reopenSettings as boolean | undefined)
       .then(() => sendResponse({ ok: true }))
       .catch(err => sendResponse({ ok: false, error: String(err) }))
     return true
@@ -231,7 +231,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 })
 
-async function handleSwitchProfile(profileId: string): Promise<void> {
+async function handleSwitchProfile(profileId: string, reopenSettings = false): Promise<void> {
   // Step 1: guard autosave
   isSwitchingRef.value = true
 
@@ -239,11 +239,15 @@ async function handleSwitchProfile(profileId: string): Promise<void> {
     const index = await getIndex()
     if (!index) throw new Error('No profiles index found')
 
-    // Step 2: save current profile snapshot
-    const current = await getProfile(index.activeProfileId)
-    if (current) {
-      const windows = await captureAllWindows()
-      await setProfile(patchProfile(current, windows))
+    // Step 2: save current profile snapshot.
+    // Skipped when called from Settings after a save — profile is already up to date
+    // and capturing now would overwrite the just-saved content.
+    if (!reopenSettings) {
+      const current = await getProfile(index.activeProfileId)
+      if (current) {
+        const windows = await captureAllWindows()
+        await setProfile(patchProfile(current, windows))
+      }
     }
 
     const target = await getProfile(profileId)
@@ -251,6 +255,13 @@ async function handleSwitchProfile(profileId: string): Promise<void> {
 
     // Steps 3–8
     await restoreProfile(target)
+
+    // Reopen Settings after a settings-triggered switch, selecting the same profile
+    if (reopenSettings) {
+      await chrome.tabs.create({
+        url: chrome.runtime.getURL('src/options/index.html') + `#select=${profileId}`,
+      })
+    }
 
     // Step 10: update active profile id
     await setIndex({ ...index, activeProfileId: profileId })

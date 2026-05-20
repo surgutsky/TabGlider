@@ -41,7 +41,14 @@
       commands.find((c) => c.name === "open-quick-switcher")?.shortcut ??
       "Not set";
     if (idx && idx.profiles.length > 0) {
-      await loadProfile(idx.profiles[0].id);
+      const hashMatch = location.hash.match(/^#select=(.+)$/);
+      const selectId = hashMatch?.[1];
+      const profileToLoad =
+        selectId && idx.profiles.some((p) => p.id === selectId)
+          ? selectId
+          : idx.profiles[0].id;
+      if (selectId) history.replaceState(null, "", location.pathname);
+      await loadProfile(profileToLoad);
     }
   }
 
@@ -169,10 +176,24 @@
       editorText = text;
       savedText = text;
       limitDirty = false;
-      flash = { ok: true, msg: "Saved!" };
-      setTimeout(() => {
-        flash = null;
-      }, 2000);
+
+      if (index?.activeProfileId === updated.id) {
+        flash = { ok: true, msg: "Saved! Applying changes…" };
+        try {
+          await chrome.runtime.sendMessage({
+            type: "SWITCH_PROFILE",
+            profileId: updated.id,
+            reopenSettings: true,
+          });
+        } catch {
+          // options tab closed during switch — expected
+        }
+      } else {
+        flash = { ok: true, msg: "Saved!" };
+        setTimeout(() => {
+          flash = null;
+        }, 2000);
+      }
     } catch (e) {
       flash = { ok: false, msg: String(e) };
     }
