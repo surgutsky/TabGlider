@@ -28,6 +28,11 @@ interface SavedGroup {
 
 interface SavedWindow {
   ref: string               // UUID
+  left: number
+  top: number
+  width: number
+  height: number
+  state: 'normal' | 'maximized' | 'minimized' | 'fullscreen'
   tabs: SavedTab[]          // flat ordered array for this window
   groups: SavedGroup[]
 }

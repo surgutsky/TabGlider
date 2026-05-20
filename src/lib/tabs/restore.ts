@@ -139,7 +139,19 @@ export async function restoreProfile(profile: Profile): Promise<void> {
     } else {
       // Create a new background window; Chrome opens a newtab placeholder
       try {
-        const newWin = await chrome.windows.create({ focused: false })
+        const isNormal = savedWindow.state === 'normal'
+        const newWin = await chrome.windows.create({
+          focused: false,
+          state: savedWindow.state,
+          ...(isNormal
+            ? {
+                left: savedWindow.left,
+                top: savedWindow.top,
+                width: savedWindow.width,
+                height: savedWindow.height,
+              }
+            : {}),
+        })
         targetWindowId = newWin.id!
         placeholderTabId = newWin.tabs?.[0]?.id
       } catch (err) {
@@ -149,6 +161,25 @@ export async function restoreProfile(profile: Profile): Promise<void> {
     }
 
     const firstTabId = await restoreWindow(savedWindow, targetWindowId)
+
+    if (i === 0) {
+      const isNormal = savedWindow.state === 'normal'
+      try {
+        await chrome.windows.update(targetWindowId, {
+          state: savedWindow.state,
+          ...(isNormal
+            ? {
+                left: savedWindow.left,
+                top: savedWindow.top,
+                width: savedWindow.width,
+                height: savedWindow.height,
+              }
+            : {}),
+        })
+      } catch (err) {
+        console.warn(`Failed to update window geometry for window ${i}: ${err}`)
+      }
+    }
     if (i === 0 && firstTabId !== undefined) {
       firstRestoredTabId = firstTabId
     }

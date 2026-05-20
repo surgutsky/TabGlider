@@ -13,10 +13,12 @@ function today(): string {
 async function captureWindow(winId: number): Promise<SavedWindow> {
   let chromeTabs: chrome.tabs.Tab[]
   let chromeGroups: chrome.tabGroups.TabGroup[]
+  let win: chrome.windows.Window
   try {
-    ;[chromeTabs, chromeGroups] = await Promise.all([
+    ;[chromeTabs, chromeGroups, win] = await Promise.all([
       chrome.tabs.query({ windowId: winId }),
       chrome.tabGroups.query({ windowId: winId }),
+      chrome.windows.get(winId),
     ])
   } catch (err) {
     throw new Error(`Failed to query tabs/groups for window ${winId}: ${err}`)
@@ -48,7 +50,16 @@ async function captureWindow(winId: number): Promise<SavedWindow> {
       pinned: t.pinned,
     }))
 
-  return { ref: crypto.randomUUID(), tabs, groups }
+  return {
+    ref: crypto.randomUUID(),
+    left: win.left ?? 0,
+    top: win.top ?? 0,
+    width: win.width ?? 800,
+    height: win.height ?? 600,
+    state: (win.state as SavedWindow['state']) ?? 'normal',
+    tabs,
+    groups,
+  }
 }
 
 export async function captureAllWindows(): Promise<SavedWindow[]> {
