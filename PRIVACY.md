@@ -1,5 +1,3 @@
-Create PRIVACY.md in the project root with this content:
-
 # Privacy Policy for TabGlider
 
 Last updated: 2026-05-20
