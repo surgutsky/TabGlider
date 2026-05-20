@@ -14,7 +14,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse -Directory)",
       "Bash(grep -E \"\\\\.\\(json|md|txt\\)$\")",
       "Bash(Get-ChildItem -Path \"C:\\\\dev\\\\TabGlider\" -Recurse)",
-      "PowerShell(head *)"
+      "PowerShell(head *)",
+      "Bash(npm test *)"
     ]
   }
 }

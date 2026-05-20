@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TabGlider",
   "version": "0.1.0",
-  "description": "Tab profile manager — save and restore named tab workspaces",
+  "description": "Manage multiple tab profiles. Save, restore, and switch between named sets of tabs and tab groups with one click.",
   "permissions": ["tabs", "tabGroups", "storage", "sidePanel", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {

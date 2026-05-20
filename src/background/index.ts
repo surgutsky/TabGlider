@@ -38,7 +38,12 @@ chrome.runtime.onInstalled.addListener(async () => {
   await injectQuickSwitcherIntoAllTabs()
 })
 
+// Set by onStartup so the first windows.onCreated can reliably detect Chrome launch
+// even if Chrome creates multiple windows in quick succession before getAll resolves.
+let pendingStartupRestore = false
+
 chrome.runtime.onStartup.addListener(async () => {
+  pendingStartupRestore = true
   await injectQuickSwitcherIntoAllTabs()
 })
 
@@ -47,13 +52,42 @@ const isSwitchingRef = { value: false }
 
 // ─── Autosave ───────────────────────────────────────────────────────────────
 
+// Holds the most recent successful capture so it can be written back when the
+// last window closes (at which point Chrome has already removed all tabs).
+let lastCapturedWindows: Awaited<ReturnType<typeof captureAllWindows>> | null = null
+
 async function autosave(): Promise<void> {
   if (isSwitchingRef.value) return
+
+  const openWindows = await chrome.windows.getAll({ windowTypes: ['normal'] })
+
   const index = await getIndex()
   if (!index) return
   const profile = await getProfile(index.activeProfileId)
   if (!profile) return
+
+  if (openWindows.length === 0) {
+    // All windows closed — write back the last known state so tabs survive
+    // across Chrome restarts instead of being wiped by an empty capture.
+    if (lastCapturedWindows !== null) {
+      await setProfile(patchProfile(profile, lastCapturedWindows))
+    }
+    return
+  }
+
   const windows = await captureAllWindows()
+  const totalTabs = windows.reduce((sum, w) => sum + w.tabs.length, 0)
+
+  if (totalTabs === 0) {
+    // All open tabs are non-capturable (e.g. chrome://newtab, chrome://settings).
+    // Saving now would wipe real tabs from the profile — preserve existing storage.
+    if (lastCapturedWindows !== null) {
+      await setProfile(patchProfile(profile, lastCapturedWindows))
+    }
+    return
+  }
+
+  lastCapturedWindows = windows
   await setProfile(patchProfile(profile, windows))
 }
 
@@ -66,8 +100,10 @@ const tabUrls = new Map<number, string>()
 // Serializes closed-tab writes so concurrent onRemoved events don't race.
 let closedTabQueue = Promise.resolve()
 
-chrome.tabs.onCreated.addListener(tab => {
-  if (tab.id && tab.url) tabUrls.set(tab.id, tab.url)
+chrome.tabs.onCreated.addListener((tab) => {
+  if (isSwitchingRef.value) return
+  const url = tab.pendingUrl ?? tab.url ?? ''
+  if (tab.id && url) tabUrls.set(tab.id, url)
   debouncedAutosave()
 })
 
@@ -102,6 +138,41 @@ chrome.tabs.onDetached.addListener(() => debouncedAutosave())
 chrome.tabGroups.onCreated.addListener(() => debouncedAutosave())
 chrome.tabGroups.onRemoved.addListener(() => debouncedAutosave())
 chrome.tabGroups.onUpdated.addListener(() => debouncedAutosave())
+
+// ─── Startup restore ─────────────────────────────────────────────────────────
+
+chrome.windows.onCreated.addListener(async (win) => {
+  if (win.type !== 'normal') return
+  if (isSwitchingRef.value) return
+
+  // Decide whether this window open is the "first" one for this Chrome profile.
+  // pendingStartupRestore is set by onStartup (handles Chrome launching multiple
+  // windows at once — avoids a race where getAll already returns >1 window).
+  // The getAll === 1 fallback covers "Chrome was running in background, no windows".
+  let shouldRestore: boolean
+  if (pendingStartupRestore) {
+    pendingStartupRestore = false
+    shouldRestore = true
+  } else {
+    const normalWindows = await chrome.windows.getAll({ windowTypes: ['normal'] })
+    shouldRestore = normalWindows.length === 1
+  }
+
+  if (!shouldRestore) return
+
+  const index = await getIndex()
+  if (!index) return
+  const profile = await getProfile(index.activeProfileId)
+  if (!profile || !profile.windows.some(w => w.tabs.length > 0)) return
+
+  isSwitchingRef.value = true
+  try {
+    await restoreProfile(profile)
+  } finally {
+    lastCapturedWindows = null
+    isSwitchingRef.value = false
+  }
+})
 
 // ─── Commands ───────────────────────────────────────────────────────────────
 
@@ -192,6 +263,7 @@ async function handleSwitchProfile(profileId: string): Promise<void> {
     throw err
   } finally {
     // Step 9
+    lastCapturedWindows = null  // stale after switch; next autosave repopulates
     isSwitchingRef.value = false
   }
 }

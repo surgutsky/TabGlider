@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getIndex, getProfile, setProfile, setIndex } from "../lib/storage";
+  import { getIndex, getProfile, setProfile, setIndex, patchProfile } from "../lib/storage";
   import type { Profile, ProfilesIndex, ClosedTab } from "../lib/types";
   import ProfileList from "../components/ProfileList.svelte";
   import ClosedTabsList from "../components/ClosedTabsList.svelte";
@@ -120,7 +120,13 @@
     await loadAll();
   }
 
-  async function reopenTab(url: string) {
+  async function reopenTab(url: string): Promise<void> {
+    const profile = await getProfile(index!.activeProfileId);
+    if (profile) {
+      const updated = profile.closedTabs.filter(t => t.url !== url);
+      await patchProfile(index!.activeProfileId, { closedTabs: updated });
+      closedTabs = updated;
+    }
     await chrome.tabs.create({ url });
   }
 
