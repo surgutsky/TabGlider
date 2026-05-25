@@ -246,8 +246,8 @@
 
   .search-input {
     display: block;
-    width: calc(100% + 24px);
-    margin: -12px -12px 12px;
+    width: calc(100% + 20px);
+    margin: -10px -12px 12px;
     background: transparent;
     color: CanvasText;
     border: none;

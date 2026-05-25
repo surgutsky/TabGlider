@@ -1,33 +1,42 @@
 <script lang="ts">
-  import { getIndex, getProfile, setProfile, setIndex, patchProfile } from "../lib/storage";
+  import {
+    getIndex,
+    getProfile,
+    setProfile,
+    setIndex,
+    patchProfile,
+  } from "../lib/storage";
   import type { Profile, ProfilesIndex, ClosedTab } from "../lib/types";
   import ProfileList from "../components/ProfileList.svelte";
   import ClosedTabsList from "../components/ClosedTabsList.svelte";
 
   function sendMessageWithTimeout(
     message: unknown,
-    timeoutMs = 10000
+    timeoutMs = 10000,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error('Switch timed out'))
-      }, timeoutMs)
+        reject(new Error("Switch timed out"));
+      }, timeoutMs);
 
       chrome.runtime.sendMessage(message, (response) => {
-        clearTimeout(timer)
+        clearTimeout(timer);
         if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message))
+          reject(new Error(chrome.runtime.lastError.message));
         } else {
-          resolve(response)
+          resolve(response);
         }
-      })
-    })
+      });
+    });
   }
 
   let index = $state<ProfilesIndex | null>(null);
+  let activeProfile = $state<Profile | null>(null);
   let closedTabs = $state<ClosedTab[]>([]);
   let isSwitching = $state(false);
   let error = $state("");
+
+  const hasMultipleWindows = $derived((activeProfile?.windows.length ?? 0) > 1);
 
   $effect(() => {
     loadAll();
@@ -43,8 +52,10 @@
       index = idx;
       if (idx?.activeProfileId) {
         const profile = await getProfile(idx.activeProfileId);
+        activeProfile = profile ?? null;
         closedTabs = profile?.closedTabs ?? [];
       } else {
+        activeProfile = null;
         closedTabs = [];
       }
     } catch (e) {
@@ -69,6 +80,7 @@
       const key = `tabglider:profile:${activeId}`;
       if (key in changes) {
         const p = changes[key].newValue as Profile | undefined;
+        activeProfile = p ?? null;
         closedTabs = p?.closedTabs ?? [];
       }
     }
@@ -123,7 +135,7 @@
   async function reopenTab(url: string): Promise<void> {
     const profile = await getProfile(index!.activeProfileId);
     if (profile) {
-      const updated = profile.closedTabs.filter(t => t.url !== url);
+      const updated = profile.closedTabs.filter((t) => t.url !== url);
       await patchProfile(index!.activeProfileId, { closedTabs: updated });
       closedTabs = updated;
     }
@@ -131,7 +143,7 @@
   }
 
   async function clearClosedTabs(): Promise<void> {
-    if (!window.confirm('Clear all recently closed tabs?')) return;
+    if (!window.confirm("Clear all recently closed tabs?")) return;
     if (!index?.activeProfileId) return;
     const profile = await getProfile(index.activeProfileId);
     if (!profile) return;
@@ -148,13 +160,13 @@
   {#if error}
     <div class="error-banner" role="alert">
       ⚠ {error}
-      <button onclick={() => error = ''}>✕</button>
+      <button onclick={() => (error = "")}>✕</button>
     </div>
   {/if}
 
   <section>
     <div class="section-header">
-      <h2 class="section-title">Profiles</h2>
+      <h2 class="section-title">Profiles (select to switch)</h2>
       <button class="btn-icon" onclick={openSettings} title="Settings"
         >⚙</button
       >
@@ -175,9 +187,21 @@
   </section>
 
   <section class="closed-section">
-    <ClosedTabsList {closedTabs} onreopen={reopenTab} onclear={clearClosedTabs} />
+    <ClosedTabsList
+      {closedTabs}
+      onreopen={reopenTab}
+      onclear={clearClosedTabs}
+    />
   </section>
 
+  {#if hasMultipleWindows}
+    <div class="hint-section">
+      <div class="hint">
+        💡 To restart Chrome without losing your windows, use "Close all
+        windows" from the taskbar context menu.
+      </div>
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -228,6 +252,9 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    height: 100vh;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .section-header {
@@ -263,6 +290,11 @@
     border-top: 1px solid var(--border);
     padding-top: 10px;
     margin-top: 2px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .section-title {
@@ -318,5 +350,20 @@
     margin: 0;
     font-size: 13px;
     color: GrayText;
+  }
+
+  .hint-section {
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: GrayText;
+    background: color-mix(in srgb, LinkText 6%, Canvas);
+    border: 1px solid color-mix(in srgb, LinkText 15%, Canvas);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    line-height: 1.5;
   }
 </style>

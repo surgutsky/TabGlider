@@ -24,37 +24,53 @@
   }
 </script>
 
-<div class="section-header">
-  <span class="section-label">RECENTLY CLOSED</span>
-  {#if closedTabs.length > 0}
-    <button class="clear-btn" onclick={onclear}>Clear</button>
-  {/if}
+<div class="container">
+  <div class="section-header">
+    <span class="section-label">RECENTLY CLOSED</span>
+    {#if closedTabs.length > 0}
+      <button class="clear-btn" onclick={onclear}>Clear</button>
+    {/if}
+  </div>
+
+  <div class="scroll-area">
+    {#if recent.length === 0}
+      <p class="empty">No recently closed tabs</p>
+    {:else}
+      <ul class="list">
+        {#each recent as tab (tab.closedAt + tab.url)}
+          <li>
+            <button class="tab-btn" onclick={() => onreopen(tab.url)} title={tab.url}>
+              <img
+                class="favicon"
+                src={faviconSrc(tab.url)}
+                alt=""
+                width="16"
+                height="16"
+                onerror={hideBrokenFavicon}
+              />
+              <span class="url">{tab.title ?? tab.url}</span>
+              <span class="time">{tab.closedAt.slice(11)}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 </div>
 
-{#if recent.length === 0}
-  <p class="empty">No recently closed tabs</p>
-{:else}
-  <ul class="list">
-    {#each recent as tab (tab.closedAt + tab.url)}
-      <li>
-        <button class="tab-btn" onclick={() => onreopen(tab.url)} title={tab.url}>
-          <img
-            class="favicon"
-            src={faviconSrc(tab.url)}
-            alt=""
-            width="16"
-            height="16"
-            onerror={hideBrokenFavicon}
-          />
-          <span class="url">{tab.title ?? tab.url}</span>
-          <span class="time">{tab.closedAt.slice(11)}</span>
-        </button>
-      </li>
-    {/each}
-  </ul>
-{/if}
-
 <style>
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 4px;
+  }
+
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+  }
+
   .section-header {
     display: flex;
     align-items: center;

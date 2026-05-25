@@ -1,10 +1,5 @@
 <script lang="ts">
-  import {
-    getIndex,
-    setIndex,
-    getProfile,
-    setProfile,
-  } from "../lib/storage";
+  import { getIndex, setIndex, getProfile, setProfile } from "../lib/storage";
   import { serializeProfile } from "../lib/md/serializer";
   import { parseProfile } from "../lib/md/parser";
   import type { Profile, ProfilesIndex } from "../lib/types";
@@ -28,7 +23,7 @@
     limitDirty = true;
   }
   let profileName = $derived(editorText.match(/^# (.+)$/m)?.[1]?.trim() ?? "");
-  let isDefaultProfile = $derived(selectedProfile?.name === 'Default');
+  let isDefaultProfile = $derived(selectedProfile?.name === "Default");
 
   $effect(() => {
     void init();
@@ -46,18 +41,22 @@
   });
 
   $effect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Control') ctrlHeld = true; };
-    const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Control') ctrlHeld = false; };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Control") ctrlHeld = true;
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Control") ctrlHeld = false;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
     };
   });
 
   $effect(() => {
-    if (!ctrlHeld && textarea) textarea.style.cursor = '';
+    if (!ctrlHeld && textarea) textarea.style.cursor = "";
   });
 
   async function init() {
@@ -113,7 +112,7 @@
   async function createProfile() {
     const name = window.prompt("Profile name:");
     if (!name?.trim()) return;
-    const existingNames = index?.profiles.map(p => p.name) ?? [];
+    const existingNames = index?.profiles.map((p) => p.name) ?? [];
     const trimmed = uniqueName(name.trim(), existingNames);
     const id = crypto.randomUUID();
     const today = new Date().toISOString().slice(0, 10);
@@ -150,14 +149,20 @@
       if (!res?.success) throw new Error(res?.error ?? "Delete failed");
       const newIndex = await getIndex();
       index = newIndex;
-      if (selectedId === profileId && newIndex && newIndex.profiles.length > 0) {
+      if (
+        selectedId === profileId &&
+        newIndex &&
+        newIndex.profiles.length > 0
+      ) {
         const fallback =
           newIndex.profiles.find((p) => p.name === "Default") ??
           newIndex.profiles[0];
         await loadProfile(fallback.id);
       }
       flash = { ok: true, msg: "Profile deleted" };
-      setTimeout(() => { flash = null; }, 2000);
+      setTimeout(() => {
+        flash = null;
+      }, 2000);
     } catch (e) {
       flash = { ok: false, msg: String(e) };
     }
@@ -177,11 +182,11 @@
       const parsed = parseProfile(editorText);
       if (!parsed.name.trim()) throw new Error("Profile name is required");
       if (isDefaultProfile) {
-        parsed.name = 'Default';
+        parsed.name = "Default";
       } else if (index) {
         const otherNames = index.profiles
-          .filter(p => p.id !== selectedProfile!.id)
-          .map(p => p.name);
+          .filter((p) => p.id !== selectedProfile!.id)
+          .map((p) => p.name);
         parsed.name = uniqueName(parsed.name, otherNames);
       }
       const today = new Date().toISOString().slice(0, 10);
@@ -272,15 +277,15 @@
 
   function updateOverlay() {
     if (!overlay || !textarea) return;
-    overlay.style.width = textarea.clientWidth + 'px';
-    overlay.style.height = textarea.clientHeight + 'px';
+    overlay.style.width = textarea.clientWidth + "px";
+    overlay.style.height = textarea.clientHeight + "px";
     const escaped = editorText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     const highlighted = escaped.replace(
       /(https?:\/\/[^\s|&\[\]]+)/g,
-      '<mark class="url-highlight">$1</mark>'
+      '<mark class="url-highlight">$1</mark>',
     );
     overlay.innerHTML = highlighted;
   }
@@ -291,23 +296,24 @@
 
   function handleMouseMove(e: MouseEvent) {
     if (!ctrlHeld || !overlay || !textarea) return;
-    overlay.style.pointerEvents = 'auto';
+    overlay.style.pointerEvents = "auto";
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    overlay.style.pointerEvents = 'none';
-    textarea.style.cursor = el?.classList.contains('url-highlight') ? 'pointer' : 'text';
+    overlay.style.pointerEvents = "none";
+    textarea.style.cursor = el?.classList.contains("url-highlight")
+      ? "pointer"
+      : "text";
   }
 
   function handleClick(e: MouseEvent) {
     if (!e.ctrlKey || !textarea) return;
     const pos = textarea.selectionStart;
     const text = editorText;
-    const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-    const lineEnd = text.indexOf('\n', pos);
+    const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+    const lineEnd = text.indexOf("\n", pos);
     const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
     const match = line.match(/https?:\/\/[^\s|\[\]]+/);
     if (match) chrome.tabs.create({ url: match[0] });
   }
-
 </script>
 
 <main>
@@ -324,7 +330,7 @@
 
   <div class="content">
     <aside class="sidebar">
-      <div class="section-label">Profiles</div>
+      <div class="section-label">Profiles (select to edit)</div>
 
       <ul class="profile-list" role="listbox" aria-label="Profiles">
         {#if index === null}
@@ -333,7 +339,8 @@
           {#each index.profiles as p (p.id)}
             {@const isActive = p.id === index.activeProfileId}
             {@const isSelected = p.id === selectedId}
-            {@const canDelete = p.name !== 'Default' && index.profiles.length > 1}
+            {@const canDelete =
+              p.name !== "Default" && index.profiles.length > 1}
             <li
               class="profile-item"
               class:selected={isSelected}
@@ -354,11 +361,11 @@
               </button>
               <button
                 class="delete-btn"
-                title={p.name === 'Default'
-                  ? 'Cannot delete Default profile'
+                title={p.name === "Default"
+                  ? "Cannot delete Default profile"
                   : index.profiles.length <= 1
-                    ? 'Cannot delete the only profile'
-                    : 'Delete profile'}
+                    ? "Cannot delete the only profile"
+                    : "Delete profile"}
                 aria-label="Delete {p.name}"
                 disabled={!canDelete}
                 onclick={() => handleDelete(p.id)}>✕</button
@@ -394,7 +401,9 @@
           oninput={onNameInput}
           placeholder="Profile name"
           readonly={isDefaultProfile}
-          title={isDefaultProfile ? 'Default profile name cannot be changed' : undefined}
+          title={isDefaultProfile
+            ? "Default profile name cannot be changed"
+            : undefined}
         />
 
         <div class="profile-meta">
@@ -418,8 +427,16 @@
             {/if}
           </div>
           <div class="editor-wrap">
-            <div class="url-overlay" class:ctrl-active={ctrlHeld} bind:this={overlay}></div>
-            <textarea class="md-editor" spellcheck="false" wrap="off" bind:value={editorText}
+            <div
+              class="url-overlay"
+              class:ctrl-active={ctrlHeld}
+              bind:this={overlay}
+            ></div>
+            <textarea
+              class="md-editor"
+              spellcheck="false"
+              wrap="off"
+              bind:value={editorText}
               bind:this={textarea}
               onscroll={syncScroll}
               onclick={handleClick}
